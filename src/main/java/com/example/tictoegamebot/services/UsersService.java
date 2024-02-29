@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -104,6 +105,7 @@ public class UsersService {
         user.addMoney(money);
     }
 
+    @Transactional(readOnly = true)
     public Statistic getUserStatistic(Long id){
         User user = userRepository.findById(id).orElse(null);
         if (user == null){
@@ -113,5 +115,43 @@ public class UsersService {
         double percentage = (double)user.getWins() / countOfGame * 100;
         return new Statistic(countOfGame, user.getWins(), user.getLoses(), user.getDraws(),
                 user.getScore(), user.getMoney(), percentage);
+    }
+
+    @Transactional(readOnly = true)
+    public List<O> getUserOSkins(Long id){
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null){
+            return new ArrayList<>();
+        }
+        return user.getOSkins();
+    }
+
+    @Transactional(readOnly = true)
+    public List<X> getUserXSkins(Long id){
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null){
+            return new ArrayList<>();
+        }
+        return user.getXSkins();
+    }
+
+    @Transactional
+    public void setOSkin(Long id, Long oId){
+        O o = oRepository.findById(oId).orElse(null);
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null || o == null){
+            return;
+        }
+        user.setOSkin(o);
+    }
+
+    @Transactional
+    public void setXSkin(Long id, Long xId){
+        X x = xRepository.findById(xId).orElse(null);
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null || x == null){
+            return;
+        }
+        user.setXSkin(x);
     }
 }

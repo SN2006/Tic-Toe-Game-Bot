@@ -1,9 +1,7 @@
 package com.example.tictoegamebot.controllers;
 
 import com.example.tictoegamebot.config.BotConfig;
-import com.example.tictoegamebot.entity.Game;
-import com.example.tictoegamebot.entity.Statistic;
-import com.example.tictoegamebot.entity.User;
+import com.example.tictoegamebot.entity.*;
 import com.example.tictoegamebot.exception.AlreadyConnectedToFriendException;
 import com.example.tictoegamebot.exception.UserNotFoundException;
 import com.example.tictoegamebot.services.UsersService;
@@ -14,6 +12,8 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
@@ -103,6 +103,12 @@ public class TicToeBot extends TelegramLongPollingBot {
                 } catch (UserNotFoundException e) {
                     sendMessage(e.getMessage(), userId.toString());
                 }
+            }else if(call_data.equals("xSkins")){
+                List<X> xSkins = usersService.getUserXSkins(user.getId());
+                xSkinMessage(user, xSkins);
+            }else if(call_data.equals("oSkins")){
+                List<O> oSkins = usersService.getUserOSkins(user.getId());
+                oSkinMessage(user, oSkins);
             }else if (call_data.equals("statistics")){
                 Statistic statistic = usersService.getUserStatistic(user.getId());
                 statisticMessage(user, statistic);
@@ -126,6 +132,26 @@ public class TicToeBot extends TelegramLongPollingBot {
                     games.put(friend, game);
                     startGameMessage(game.nowStepUser());
                 }
+            }else if(call_data.startsWith("setXSkin")){
+                String[] splitData = call_data.split(" ");
+                Long xSkinId = Long.parseLong(splitData[1]);
+                Integer messageId = Integer.parseInt(splitData[2]);
+                usersService.setXSkin(user.getId(), xSkinId);
+                List<X> xSkins = usersService.getUserXSkins(user.getId());
+                editMessageMarkup(user.getId().toString(), messageId, xSkinsMarkup(xSkinId, xSkins, messageId));
+
+//                deleteMessage(user.getId().toString(), messageId);
+//                sendMessage("Skin successfully changed!", userId.toString());
+            }else if(call_data.startsWith("setOSkin")){
+                String[] splitData = call_data.split(" ");
+                Long oSkinId = Long.parseLong(splitData[1]);
+                Integer messageId = Integer.parseInt(splitData[2]);
+                usersService.setOSkin(user.getId(), oSkinId);
+                List<O> oSkins = usersService.getUserOSkins(user.getId());
+                editMessageMarkup(user.getId().toString(), messageId, oSkinsMarkup(oSkinId, oSkins, messageId));
+
+//                deleteMessage(user.getId().toString(), messageId);
+//                sendMessage("Skin successfully changed!", userId.toString());
             }else if (call_data.startsWith("step")){
                 if (!games.containsKey(user)){
                     sendMessage("The current game has been completed", userId.toString());
@@ -215,10 +241,10 @@ public class TicToeBot extends TelegramLongPollingBot {
     }
 
     private void sendMessage(String text, String id, InlineKeyboardMarkup inlineKeyboardMarkup){
-        SendMessage sendMessage = SendMessage.builder()
-                .chatId(id)
-                .text(text)
-                .build();
+        System.out.println(text);
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(id);
+        sendMessage.setText(text);
         sendMessage.setReplyMarkup(inlineKeyboardMarkup);
         try {
             this.sendApiMethod(sendMessage);
@@ -248,6 +274,29 @@ public class TicToeBot extends TelegramLongPollingBot {
         editMessageText.setReplyMarkup(inlineKeyboardMarkup);
         try {
             this.sendApiMethod(editMessageText);
+        } catch (TelegramApiException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    private void editMessageMarkup(String id, Integer message_id, InlineKeyboardMarkup inlineKeyboardMarkup){
+        EditMessageReplyMarkup editMessageReplyMarkup = new EditMessageReplyMarkup();
+        editMessageReplyMarkup.setReplyMarkup(inlineKeyboardMarkup);
+        editMessageReplyMarkup.setChatId(id);
+        editMessageReplyMarkup.setMessageId(message_id);
+        try {
+            this.sendApiMethod(editMessageReplyMarkup);
+        } catch (TelegramApiException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    private void deleteMessage(String id, Integer message_id){
+        DeleteMessage deleteMessage = new DeleteMessage();
+        deleteMessage.setChatId(id);
+        deleteMessage.setMessageId(message_id);
+        try {
+            this.sendApiMethod(deleteMessage);
         } catch (TelegramApiException e) {
             System.out.println(e.getMessage());
         }
@@ -432,12 +481,24 @@ public class TicToeBot extends TelegramLongPollingBot {
         sendMessage("You earned %d\uD83D\uDCB5".formatted(money), user.getId().toString());
     }
 
+    private void xSkinMessage(User user, List<X> xSkins){
+        Message message = sendAndGetMessage("%s, Choose a skin: ".formatted(user.getUsername()), user.getId().toString());
+        editMessageMarkup(user.getId().toString(), message.getMessageId(), xSkinsMarkup(user.getXSkin().getId(), xSkins, message.getMessageId()));
+    }
+
+    private void oSkinMessage(User user, List<O> oSkins){
+        Message message = sendAndGetMessage("%s, Choose a skin: ".formatted(user.getUsername()), user.getId().toString());
+        editMessageMarkup(user.getId().toString(), message.getMessageId(), oSkinsMarkup(user.getOSkin().getId(), oSkins, message.getMessageId()));
+    }
+
     private InlineKeyboardMarkup menuMarkup(){
         InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         List<InlineKeyboardButton> row3 = new ArrayList<>();
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        List<InlineKeyboardButton> row5 = new ArrayList<>();
 
         InlineKeyboardButton startButton = new InlineKeyboardButton();
         startButton.setText("\uD83D\uDC49Play with friend");
@@ -456,6 +517,18 @@ public class TicToeBot extends TelegramLongPollingBot {
         statisticsButton.setCallbackData("statistics");
         row3.add(statisticsButton);
         rows.add(row3);
+
+        InlineKeyboardButton xSkinsButton = new InlineKeyboardButton();
+        xSkinsButton.setText("❌My skins on X");
+        xSkinsButton.setCallbackData("xSkins");
+        row4.add(xSkinsButton);
+        rows.add(row4);
+
+        InlineKeyboardButton oSkinsButton = new InlineKeyboardButton();
+        oSkinsButton.setText("⭕My skins on 0");
+        oSkinsButton.setCallbackData("oSkins");
+        row5.add(oSkinsButton);
+        rows.add(row5);
 
         markupInline.setKeyboard(rows);
         return markupInline;
@@ -531,6 +604,65 @@ public class TicToeBot extends TelegramLongPollingBot {
                 inlineKeyboardButton.setCallbackData(callBackData);
                 row.add(inlineKeyboardButton);
             }
+            rows.add(row);
+        }
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup xSkinsMarkup(Long xSkinId, List<X> xSkins, Integer messageId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        int counter = 0;
+        for (X x : xSkins) {
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            if (x.getId().equals(xSkinId)) {
+                button.setCallbackData("currentSkinX");
+                button.setText("✅" + x.getSkin());
+                System.out.println(x.getId());
+            }else{
+                button.setCallbackData("setXSkin " + x.getId() + " " + messageId);
+                button.setText(x.getSkin());
+            }
+            counter++;
+            row.add(button);
+            if (counter == 3) {
+                rows.add(row);
+                counter = 0;
+                row = new ArrayList<>();
+            }
+        }
+        if (!row.isEmpty()){
+            rows.add(row);
+        }
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup oSkinsMarkup(Long oSkinId, List<O> oSkins, Integer messageId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        int counter = 0;
+        for (O o : oSkins) {
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            if (o.getId().equals(oSkinId)) {
+                button.setCallbackData("currentSkinO");
+                button.setText("✅" + o.getSkin());
+            }else{
+                button.setCallbackData("setOSkin " + o.getId() + " " + messageId);
+                button.setText(o.getSkin());
+            }
+            counter++;
+            row.add(button);
+            if (counter == 3) {
+                rows.add(row);
+                counter = 0;
+                row = new ArrayList<>();
+            }
+        }
+        if (!row.isEmpty()){
             rows.add(row);
         }
         markup.setKeyboard(rows);
