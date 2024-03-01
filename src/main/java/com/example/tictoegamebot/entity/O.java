@@ -16,7 +16,7 @@ public class O {
     @Column(name = "skin")
     private String skin;
     @Column(name = "price")
-    private Integer price;
+    private int price;
 
     public O() {
 

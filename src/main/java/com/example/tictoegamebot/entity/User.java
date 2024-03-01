@@ -101,6 +101,10 @@ public class User {
         this.money += money;
     }
 
+    public void takeMoney(int money) {
+        this.money -= money;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

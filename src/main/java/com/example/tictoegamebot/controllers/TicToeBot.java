@@ -3,8 +3,11 @@ package com.example.tictoegamebot.controllers;
 import com.example.tictoegamebot.config.BotConfig;
 import com.example.tictoegamebot.entity.*;
 import com.example.tictoegamebot.exception.AlreadyConnectedToFriendException;
+import com.example.tictoegamebot.exception.NotEnoughMoneyException;
 import com.example.tictoegamebot.exception.UserNotFoundException;
+import com.example.tictoegamebot.services.OsService;
 import com.example.tictoegamebot.services.UsersService;
+import com.example.tictoegamebot.services.XsService;
 import com.example.tictoegamebot.util.Constants;
 import com.example.tictoegamebot.util.ScoreCalculator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,14 +39,18 @@ public class TicToeBot extends TelegramLongPollingBot {
 
     private final BotConfig botConfig;
     private final UsersService usersService;
+    private final XsService xsService;
+    private final OsService osService;
     private Map<User, Game> games = new HashMap<>();
     private Map<User, Integer> messageIdMap = new HashMap<>();
 
     @Autowired
-    public TicToeBot(BotConfig botConfig, UsersService usersService) {
+    public TicToeBot(BotConfig botConfig, UsersService usersService, XsService xsService, OsService osService) {
         super(botConfig.getBotToken());
         this.botConfig = botConfig;
         this.usersService = usersService;
+        this.xsService = xsService;
+        this.osService = osService;
     }
 
     @Override
@@ -103,6 +110,14 @@ public class TicToeBot extends TelegramLongPollingBot {
                 } catch (UserNotFoundException e) {
                     sendMessage(e.getMessage(), userId.toString());
                 }
+            }else if(call_data.equals("shop")){
+                shopMessage(user);
+            }else if(call_data.equals("xShop")){
+                List<X> shop = xsService.getShopForUser(user.getId());
+                xShopMessage(user, shop);
+            }else if(call_data.equals("oShop")){
+                List<O> shop = osService.getShopForUser(user.getId());
+                oShopMessage(user, shop);
             }else if(call_data.equals("xSkins")){
                 List<X> xSkins = usersService.getUserXSkins(user.getId());
                 xSkinMessage(user, xSkins);
@@ -131,6 +146,32 @@ public class TicToeBot extends TelegramLongPollingBot {
                     games.put(user, game);
                     games.put(friend, game);
                     startGameMessage(game.nowStepUser());
+                }
+            }else if(call_data.startsWith("buyX")){
+                String[] splitData = call_data.split(" ");
+                Long xId = Long.parseLong(splitData[1]);
+                Integer messageId = Integer.parseInt(splitData[2]);
+                try{
+                    xsService.buyXForUser(user.getId(), xId);
+                    deleteMessage(user.getId().toString(), messageId);
+                    sendMessage("The skin has been added to your collection",
+                            user.getId().toString());
+                }catch (NotEnoughMoneyException e){
+                    deleteMessage(user.getId().toString(), messageId);
+                    sendMessage(e.getMessage(), userId.toString());
+                }
+            }else if(call_data.startsWith("buyO")){
+                String[] splitData = call_data.split(" ");
+                Long oId = Long.parseLong(splitData[1]);
+                Integer messageId = Integer.parseInt(splitData[2]);
+                try{
+                    osService.buyOForUser(user.getId(), oId);
+                    deleteMessage(user.getId().toString(), messageId);
+                    sendMessage("The skin has been added to your collection",
+                            user.getId().toString());
+                }catch (NotEnoughMoneyException e){
+                    deleteMessage(user.getId().toString(), messageId);
+                    sendMessage(e.getMessage(), userId.toString());
                 }
             }else if(call_data.startsWith("setXSkin")){
                 String[] splitData = call_data.split(" ");
@@ -241,7 +282,6 @@ public class TicToeBot extends TelegramLongPollingBot {
     }
 
     private void sendMessage(String text, String id, InlineKeyboardMarkup inlineKeyboardMarkup){
-        System.out.println(text);
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(id);
         sendMessage.setText(text);
@@ -491,6 +531,48 @@ public class TicToeBot extends TelegramLongPollingBot {
         editMessageMarkup(user.getId().toString(), message.getMessageId(), oSkinsMarkup(user.getOSkin().getId(), oSkins, message.getMessageId()));
     }
 
+    private void shopMessage(User user){
+        sendMessage("\uD83D\uDECD️ Shop \uD83D\uDECD️", user.getId().toString(), shopMarkup());
+    }
+
+    private void xShopMessage(User user, List<X> shop){
+        if (shop.isEmpty()){
+            sendMessage("You have already purchased all skins for X", user.getId().toString());
+            return;
+        }
+        Message message = sendAndGetMessage("Available X skins:", user.getId().toString());
+        editMessageMarkup(user.getId().toString(), message.getMessageId(), xShopMarkUp(shop, message.getMessageId()));
+    }
+
+    private void oShopMessage(User user, List<O> shop){
+        if (shop.isEmpty()){
+            sendMessage("You have already purchased all skins for O", user.getId().toString());
+            return;
+        }
+        Message message = sendAndGetMessage("Available O skins:", user.getId().toString());
+        editMessageMarkup(user.getId().toString(), message.getMessageId(), oShopMarkUp(shop, message.getMessageId()));
+    }
+
+    private InlineKeyboardMarkup shopMarkup(){
+        InlineKeyboardMarkup shopMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+
+        InlineKeyboardButton xShopButton = new InlineKeyboardButton();
+        xShopButton.setText("❌ skins");
+        xShopButton.setCallbackData("xShop");
+        row1.add(xShopButton);
+
+        InlineKeyboardButton oShopButton = new InlineKeyboardButton();
+        oShopButton.setText("⭕ skins");
+        oShopButton.setCallbackData("oShop");
+        row1.add(oShopButton);
+
+        rows.add(row1);
+        shopMarkup.setKeyboard(rows);
+        return shopMarkup;
+    }
+
     private InlineKeyboardMarkup menuMarkup(){
         InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -499,6 +581,7 @@ public class TicToeBot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> row3 = new ArrayList<>();
         List<InlineKeyboardButton> row4 = new ArrayList<>();
         List<InlineKeyboardButton> row5 = new ArrayList<>();
+        List<InlineKeyboardButton> row6 = new ArrayList<>();
 
         InlineKeyboardButton startButton = new InlineKeyboardButton();
         startButton.setText("\uD83D\uDC49Play with friend");
@@ -529,6 +612,12 @@ public class TicToeBot extends TelegramLongPollingBot {
         oSkinsButton.setCallbackData("oSkins");
         row5.add(oSkinsButton);
         rows.add(row5);
+
+        InlineKeyboardButton shopButton = new InlineKeyboardButton();
+        shopButton.setText("\uD83D\uDED2Shop");
+        shopButton.setCallbackData("shop");
+        row6.add(shopButton);
+        rows.add(row6);
 
         markupInline.setKeyboard(rows);
         return markupInline;
@@ -604,6 +693,36 @@ public class TicToeBot extends TelegramLongPollingBot {
                 inlineKeyboardButton.setCallbackData(callBackData);
                 row.add(inlineKeyboardButton);
             }
+            rows.add(row);
+        }
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup xShopMarkUp(List<X> shop, Integer messageId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        for (X skin : shop){
+            List<InlineKeyboardButton> row = new ArrayList<>();
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            button.setText("%s - %d\uD83D\uDCB5".formatted(skin.getSkin(), skin.getPrice()));
+            button.setCallbackData("buyX %d %d".formatted(skin.getId(), messageId));
+            row.add(button);
+            rows.add(row);
+        }
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup oShopMarkUp(List<O> shop, Integer messageId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        for (O skin : shop){
+            List<InlineKeyboardButton> row = new ArrayList<>();
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            button.setText("%s - %d\uD83D\uDCB5".formatted(skin.getSkin(), skin.getPrice()));
+            button.setCallbackData("buyO %d %d".formatted(skin.getId(), messageId));
+            row.add(button);
             rows.add(row);
         }
         markup.setKeyboard(rows);
