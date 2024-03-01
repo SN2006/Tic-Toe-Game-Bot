@@ -10,6 +10,7 @@ import com.example.tictoegamebot.repositories.ORepository;
 import com.example.tictoegamebot.repositories.UserRepository;
 import com.example.tictoegamebot.repositories.XRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -153,5 +154,10 @@ public class UsersService {
             return;
         }
         user.setXSkin(x);
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> getRating(){
+        return userRepository.findAll(Sort.by("score").descending());
     }
 }

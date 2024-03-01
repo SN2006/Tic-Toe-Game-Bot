@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class TicToeBot extends TelegramLongPollingBot {
@@ -110,6 +111,9 @@ public class TicToeBot extends TelegramLongPollingBot {
                 } catch (UserNotFoundException e) {
                     sendMessage(e.getMessage(), userId.toString());
                 }
+            }else if(call_data.equals("rating")){
+                List<User> rating = usersService.getRating();
+                ratingMessage(user, rating);
             }else if(call_data.equals("shop")){
                 shopMessage(user);
             }else if(call_data.equals("xShop")){
@@ -553,6 +557,31 @@ public class TicToeBot extends TelegramLongPollingBot {
         editMessageMarkup(user.getId().toString(), message.getMessageId(), oShopMarkUp(shop, message.getMessageId()));
     }
 
+    private void ratingMessage(User user, List<User> rating){
+        AtomicInteger counter = new AtomicInteger();
+        StringBuilder text = new StringBuilder();
+        for (User ratingUser : rating){
+            int place = counter.incrementAndGet();
+            if (place == 1){
+                text.append("\uD83E\uDD47: ");
+            }else if (place == 2){
+                text.append("\uD83E\uDD48: ");
+            }else if (place == 3){
+                text.append("\uD83E\uDD49: ");
+            }else {
+                text.append("%d: ".formatted(place));
+            }
+            if (ratingUser.getId().equals(user.getId())){
+                text.append("\uD83D\uDC49");
+            }
+            text.append(ratingUser.getUsername());
+            text.append(" - ");
+            text.append(ratingUser.getScore());
+            text.append("\uD83C\uDF96\n");
+        }
+        sendMessage(text.toString(), user.getId().toString());
+    }
+
     private InlineKeyboardMarkup shopMarkup(){
         InlineKeyboardMarkup shopMarkup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -582,6 +611,7 @@ public class TicToeBot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> row4 = new ArrayList<>();
         List<InlineKeyboardButton> row5 = new ArrayList<>();
         List<InlineKeyboardButton> row6 = new ArrayList<>();
+        List<InlineKeyboardButton> row7 = new ArrayList<>();
 
         InlineKeyboardButton startButton = new InlineKeyboardButton();
         startButton.setText("\uD83D\uDC49Play with friend");
@@ -595,23 +625,28 @@ public class TicToeBot extends TelegramLongPollingBot {
         row2.add(disconnectButton);
         rows.add(row2);
 
+        InlineKeyboardButton ratingButton = new InlineKeyboardButton();
+        ratingButton.setText("\uD83C\uDFC5Rating");
+        ratingButton.setCallbackData("rating");
+        row3.add(ratingButton);
+        rows.add(row3);
+
         InlineKeyboardButton statisticsButton = new InlineKeyboardButton();
         statisticsButton.setText("\uD83C\uDFC6My statistics");
         statisticsButton.setCallbackData("statistics");
-        row3.add(statisticsButton);
-        rows.add(row3);
+        row4.add(statisticsButton);
+        rows.add(row4);
 
         InlineKeyboardButton xSkinsButton = new InlineKeyboardButton();
         xSkinsButton.setText("❌My skins on X");
         xSkinsButton.setCallbackData("xSkins");
-        row4.add(xSkinsButton);
-        rows.add(row4);
+        row5.add(xSkinsButton);
+        rows.add(row5);
 
         InlineKeyboardButton oSkinsButton = new InlineKeyboardButton();
         oSkinsButton.setText("⭕My skins on 0");
         oSkinsButton.setCallbackData("oSkins");
         row5.add(oSkinsButton);
-        rows.add(row5);
 
         InlineKeyboardButton shopButton = new InlineKeyboardButton();
         shopButton.setText("\uD83D\uDED2Shop");
