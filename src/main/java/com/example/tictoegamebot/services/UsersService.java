@@ -160,4 +160,14 @@ public class UsersService {
     public List<User> getRating(){
         return userRepository.findAll(Sort.by("score").descending());
     }
+
+    @Transactional
+    public User setGameMode(Long id, int gameModeId){
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null){
+            return null;
+        }
+        user.setGameMode(gameModeId);
+        return user;
+    }
 }

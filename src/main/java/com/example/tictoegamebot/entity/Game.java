@@ -34,6 +34,11 @@ public class Game {
                 inLine = 4;
                 break;
             }
+            case 2:{
+                board = new int[8][8];
+                inLine = 5;
+                break;
+            }
             case 0:
             default:{
                 board = new int[3][3];
@@ -95,8 +100,10 @@ public class Game {
                     countO = 0;
                 }else if (board[y][x] == 1){
                     countX++;
+                    countO = 0;
                 }else if (board[y][x] == 2){
                     countO++;
+                    countX = 0;
                 }
                 if (countX == inLine){
                     for (int i = 0; i < inLine; i++){
@@ -125,8 +132,10 @@ public class Game {
                     countO = 0;
                 }else if (board[y][x] == 1){
                     countX++;
+                    countO = 0;
                 }else if (board[y][x] == 2){
                     countO++;
+                    countX = 0;
                 }
                 if (countX == inLine){
                     for (int i = 0; i < inLine; i++){
@@ -156,8 +165,10 @@ public class Game {
                         countO = 0;
                     }else if (board[y + k][x + k] == 1){
                         countX++;
+                        countO = 0;
                     }else if (board[y + k][x + k] == 2){
                         countO++;
+                        countX = 0;
                     }
                 }
                 if (countX == inLine){
@@ -188,8 +199,10 @@ public class Game {
                         countO = 0;
                     }else if (board[y - k][x + k] == 1){
                         countX++;
+                        countO = 0;
                     }else if (board[y - k][x + k] == 2){
                         countO++;
+                        countX = 0;
                     }
                 }
                 if (countX == inLine){

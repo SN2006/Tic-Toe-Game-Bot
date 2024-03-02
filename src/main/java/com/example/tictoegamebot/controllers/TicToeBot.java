@@ -68,7 +68,7 @@ public class TicToeBot extends TelegramLongPollingBot {
             user = usersService.updateUsername(user, userFirstName);
             if (textFromUser.equals("/start")){
                 startMessage(user);
-            }else if (textFromUser.equals("getId")){
+            }else if (textFromUser.equals("/get_id")){
                 getIdMessage(user);
             }else if (textFromUser.startsWith("/invite")){
                 try {
@@ -93,7 +93,7 @@ public class TicToeBot extends TelegramLongPollingBot {
                 } catch (UserNotFoundException e) {
                     sendMessage(e.getMessage(), userId.toString());
                 }
-            } else if (textFromUser.equals("\uD83C\uDFC6Menu\uD83C\uDFC6")){
+            } else if (textFromUser.equals("/menu")){
                 menuMessage(user);
             }else{
                 sendMessage("Sorry, but I don`t understand you", userId.toString());
@@ -111,6 +111,8 @@ public class TicToeBot extends TelegramLongPollingBot {
                 } catch (UserNotFoundException e) {
                     sendMessage(e.getMessage(), userId.toString());
                 }
+            }else if(call_data.equals("settings")){
+                settingsMessage(user);
             }else if(call_data.equals("rating")){
                 List<User> rating = usersService.getRating();
                 ratingMessage(user, rating);
@@ -141,9 +143,9 @@ public class TicToeBot extends TelegramLongPollingBot {
                     User friend = user.getFriend();
                     Game game;
                     if (isUserX){
-                        game = new Game(0, user, friend);
+                        game = new Game(friend.getGameMode(), user, friend);
                     }else{
-                        game = new Game(0, friend, user);
+                        game = new Game(user.getGameMode(), friend, user);
                     }
                     user.setGame(game);
                     friend.setGame(game);
@@ -151,6 +153,11 @@ public class TicToeBot extends TelegramLongPollingBot {
                     games.put(friend, game);
                     startGameMessage(game.nowStepUser());
                 }
+            }else if(call_data.startsWith("setGameMode")){
+                int mode = Integer.parseInt(call_data.split(" ")[1]);
+                int messageId = Integer.parseInt(call_data.split(" ")[2]);
+                user = usersService.setGameMode(user.getId(), mode);
+                editMessageMarkup(user.getId().toString(), messageId, settingMarkup(user, messageId));
             }else if(call_data.startsWith("buyX")){
                 String[] splitData = call_data.split(" ");
                 Long xId = Long.parseLong(splitData[1]);
@@ -374,8 +381,10 @@ public class TicToeBot extends TelegramLongPollingBot {
     }
 
     private void startMessage(User user){
+//        sendMessage("Hello, %s! Welcome to Tic-Toe Bot!".formatted(user.getUsername()),
+//                user.getId().toString(), replyKeyboardMarkup());
         sendMessage("Hello, %s! Welcome to Tic-Toe Bot!".formatted(user.getUsername()),
-                user.getId().toString(), replyKeyboardMarkup());
+                user.getId().toString());
     }
 
     private void getIdMessage(User user){
@@ -654,6 +663,12 @@ public class TicToeBot extends TelegramLongPollingBot {
         row6.add(shopButton);
         rows.add(row6);
 
+        InlineKeyboardButton settingButton = new InlineKeyboardButton();
+        settingButton.setText("⚙️Settings");
+        settingButton.setCallbackData("settings");
+        row7.add(settingButton);
+        rows.add(row7);
+
         markupInline.setKeyboard(rows);
         return markupInline;
     }
@@ -674,6 +689,12 @@ public class TicToeBot extends TelegramLongPollingBot {
                 statistic.getCountOfWins(), statistic.getCountOfLosses(), statistic.getCountOfDraws(),
                 statistic.getMoney()
         ), user.getId().toString());
+    }
+
+    private void settingsMessage(User user){
+        Message message = sendAndGetMessage("What type of field do you prefer?", user.getId().toString());
+
+        editMessageMarkup(user.getId().toString(), message.getMessageId(), settingMarkup(user, message.getMessageId()));
     }
 
     private ReplyKeyboardMarkup replyKeyboardMarkup() {
@@ -698,8 +719,8 @@ public class TicToeBot extends TelegramLongPollingBot {
 
     private List<KeyboardButton> keyboardButtons() {
         List<KeyboardButton> buttons = new ArrayList<>();
-        buttons.add(new KeyboardButton("\uD83C\uDFC6Menu\uD83C\uDFC6"));
-        buttons.add(new KeyboardButton("getId"));
+        buttons.add(new KeyboardButton("/menu"));
+        buttons.add(new KeyboardButton("/get_id"));
         //создаем и заполняем список кнопок
         return buttons;
     }
@@ -773,8 +794,7 @@ public class TicToeBot extends TelegramLongPollingBot {
             InlineKeyboardButton button = new InlineKeyboardButton();
             if (x.getId().equals(xSkinId)) {
                 button.setCallbackData("currentSkinX");
-                button.setText("✅" + x.getSkin());
-                System.out.println(x.getId());
+                button.setText("✳" + x.getSkin() + "✳");
             }else{
                 button.setCallbackData("setXSkin " + x.getId() + " " + messageId);
                 button.setText(x.getSkin());
@@ -803,7 +823,7 @@ public class TicToeBot extends TelegramLongPollingBot {
             InlineKeyboardButton button = new InlineKeyboardButton();
             if (o.getId().equals(oSkinId)) {
                 button.setCallbackData("currentSkinO");
-                button.setText("✅" + o.getSkin());
+                button.setText("✳" + o.getSkin() + "✳");
             }else{
                 button.setCallbackData("setOSkin " + o.getId() + " " + messageId);
                 button.setText(o.getSkin());
@@ -819,6 +839,46 @@ public class TicToeBot extends TelegramLongPollingBot {
         if (!row.isEmpty()){
             rows.add(row);
         }
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    private InlineKeyboardMarkup settingMarkup(User user, Integer messageId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+
+        InlineKeyboardButton board3On3Button = new InlineKeyboardButton();
+        board3On3Button.setCallbackData("setGameMode 0 " + messageId);
+        if (user.getGameMode() == 0){
+            board3On3Button.setCallbackData("blocked");
+            board3On3Button.setText("✳3×3✳");
+        }else {
+            board3On3Button.setText("3×3");
+        }
+        row1.add(board3On3Button);
+
+        InlineKeyboardButton board5On5Button = new InlineKeyboardButton();
+        board5On5Button.setCallbackData("setGameMode 1 " + messageId);
+        if (user.getGameMode() == 1){
+            board5On5Button.setCallbackData("blocked");
+            board5On5Button.setText("✳5×5✳");
+        }else {
+            board5On5Button.setText("5×5");
+        }
+        row1.add(board5On5Button);
+
+        InlineKeyboardButton board8On8Button = new InlineKeyboardButton();
+        board8On8Button.setCallbackData("setGameMode 2 " + messageId);
+        if (user.getGameMode() == 2){
+            board8On8Button.setCallbackData("blocked");
+            board8On8Button.setText("✳8×8✳");
+        }else {
+            board8On8Button.setText("8×8");
+        }
+        row1.add(board8On8Button);
+
+        rows.add(row1);
         markup.setKeyboard(rows);
         return markup;
     }

@@ -26,6 +26,8 @@ public class User {
     private int score;
     @Column(name = "money")
     private int money;
+    @Column(name = "game_mode")
+    private int gameMode;
 
     @ManyToOne
     @JoinColumn(name = "x_skin_id", referencedColumnName = "id")
