@@ -170,4 +170,14 @@ public class UsersService {
         user.setGameMode(gameModeId);
         return user;
     }
+
+    @Transactional
+    public User addMoney(Long id, int money){
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null){
+            return null;
+        }
+        user.addMoney(money);
+        return user;
+    }
 }

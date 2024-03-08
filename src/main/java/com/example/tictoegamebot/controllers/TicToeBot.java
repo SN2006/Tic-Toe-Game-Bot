@@ -18,7 +18,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -68,6 +67,14 @@ public class TicToeBot extends TelegramLongPollingBot {
             user = usersService.updateUsername(user, userFirstName);
             if (textFromUser.equals("/start")){
                 startMessage(user);
+            }else if(textFromUser.startsWith("/addMoney") && user.getId().equals(botConfig.getBotAdminId())){
+                String[] split = textFromUser.split(" ");
+                Long userToGetMoneyId = Long.parseLong(split[1]);
+                User userToGetMoney = usersService.addMoney(userToGetMoneyId, 500);
+                if (userToGetMoney != null){
+                    sendMessage(String.format("You gave %d\uD83D\uDCB5 to %s", 500, userToGetMoney.getUsername()), user.getId().toString());
+                    sendMessage(String.format("You get %d\uD83D\uDCB5", 500), userToGetMoneyId.toString());
+                }
             }else if (textFromUser.equals("/get_id")){
                 getIdMessage(user);
             }else if (textFromUser.startsWith("/invite")){
@@ -139,10 +146,11 @@ public class TicToeBot extends TelegramLongPollingBot {
                             "To connect, use the /invite command, passing it your friend’s id " +
                             "(for example: /invite 1103395784)", userId.toString());
                 }else {
+                    int randomNumber = (int) (Math.random() * 100);
                     boolean isUserX = Constants.RANDOM.nextBoolean();
                     User friend = user.getFriend();
                     Game game;
-                    if (isUserX){
+                    if (randomNumber < 50){
                         game = new Game(friend.getGameMode(), user, friend);
                     }else{
                         game = new Game(user.getGameMode(), friend, user);
@@ -381,10 +389,10 @@ public class TicToeBot extends TelegramLongPollingBot {
     }
 
     private void startMessage(User user){
-//        sendMessage("Hello, %s! Welcome to Tic-Toe Bot!".formatted(user.getUsername()),
-//                user.getId().toString(), replyKeyboardMarkup());
         sendMessage("Hello, %s! Welcome to Tic-Toe Bot!".formatted(user.getUsername()),
-                user.getId().toString());
+                user.getId().toString(), replyKeyboardMarkup());
+//        sendMessage("Hello, %s! Welcome to Tic-Toe Bot!".formatted(user.getUsername()),
+//                user.getId().toString());
     }
 
     private void getIdMessage(User user){
@@ -553,7 +561,7 @@ public class TicToeBot extends TelegramLongPollingBot {
             sendMessage("You have already purchased all skins for X", user.getId().toString());
             return;
         }
-        Message message = sendAndGetMessage("Available X skins:", user.getId().toString());
+        Message message = sendAndGetMessage(String.format("Your money: %d \uD83D\uDCB5\nAvailable X skins:", user.getMoney()), user.getId().toString());
         editMessageMarkup(user.getId().toString(), message.getMessageId(), xShopMarkUp(shop, message.getMessageId()));
     }
 
@@ -562,7 +570,7 @@ public class TicToeBot extends TelegramLongPollingBot {
             sendMessage("You have already purchased all skins for O", user.getId().toString());
             return;
         }
-        Message message = sendAndGetMessage("Available O skins:", user.getId().toString());
+        Message message = sendAndGetMessage(String.format("Your money: %d \uD83D\uDCB5\nAvailable O skins:", user.getMoney()), user.getId().toString());
         editMessageMarkup(user.getId().toString(), message.getMessageId(), oShopMarkUp(shop, message.getMessageId()));
     }
 
