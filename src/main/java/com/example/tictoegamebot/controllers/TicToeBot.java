@@ -140,6 +140,38 @@ public class TicToeBot extends TelegramLongPollingBot {
             }else if (call_data.equals("statistics")){
                 Statistic statistic = usersService.getUserStatistic(user.getId());
                 statisticMessage(user, statistic);
+            }else if (call_data.equals("drawAgree")){
+                User friend = user.getFriend();
+                Game game = games.get(user);
+                user.setGame(game);
+                friend.setGame(game);
+                game.changeAgreeMap(user.getId());
+                if (game.isGameOver()){
+                    int score = 0;
+                    int money = Constants.RANDOM.nextInt(20) + 5;
+                    usersService.addResult(user.getId(), 0, money);
+                    usersService.addResult(friend.getId(), 0, money);
+                    if (game.nowStep().getId().equals(user.getId())){
+                        drawMessage(user, score);
+                    }else {
+                        drawMessage(friend, score);
+                    }
+                    moneyInfoMessage(user, money);
+                    moneyInfoMessage(friend, money);
+
+                    user.setGame(null);
+                    friend.setGame(null);
+                    games.remove(user);
+                    games.remove(friend);
+                    messageIdMap.remove(user);
+                    messageIdMap.remove(friend);
+                }else{
+                    if (game.nowStep().getId().equals(user.getId())){
+                        nextStepMessage(user);
+                    }else{
+                        nextStepMessage(friend);
+                    }
+                }
             }else if (call_data.equals("start game")){
                 if (user.getFriend() == null){
                     sendMessage("You are not connected to a friend. " +
@@ -260,7 +292,7 @@ public class TicToeBot extends TelegramLongPollingBot {
                 }
                 if (game.isGameOver()){
                     user.setGame(null);
-                    friend.setFriend(null);
+                    friend.setGame(null);
                     games.remove(user);
                     games.remove(friend);
                     messageIdMap.remove(user);
@@ -427,7 +459,7 @@ public class TicToeBot extends TelegramLongPollingBot {
         Message friendMessage = sendAndGetMessage(text.formatted(
                 game.getWidth(), game.getHeight(), game.getInLine(), friend.getXSkin().getSkin(), user.getUsername(),
                 friend.getOSkin().getSkin(), friend.getUsername()
-        ), friend.getId().toString());
+        ), friend.getId().toString(), offerADrawMarkup(friend));
         messageIdMap.put(user, userMessage.getMessageId());
         messageIdMap.put(friend, friendMessage.getMessageId());
     }
@@ -450,7 +482,7 @@ public class TicToeBot extends TelegramLongPollingBot {
                     game.getWidth(), game.getHeight(), game.getInLine(),
                     friend.getXSkin().getSkin(), user.getUsername(),
                     friend.getOSkin().getSkin(), friend.getUsername()
-            ), friend.getId().toString(), messageIdMap.get(friend), null);
+            ), friend.getId().toString(), messageIdMap.get(friend), offerADrawMarkup(friend));
         }else{
             editMessage(text.formatted(
                     game.getWidth(), game.getHeight(), game.getInLine(),
@@ -461,7 +493,7 @@ public class TicToeBot extends TelegramLongPollingBot {
                     game.getWidth(), game.getHeight(), game.getInLine(),
                     friend.getOSkin().getSkin(), user.getUsername(),
                     friend.getXSkin().getSkin(), friend.getUsername()
-            ), friend.getId().toString(), messageIdMap.get(friend), null);
+            ), friend.getId().toString(), messageIdMap.get(friend), offerADrawMarkup(friend));
         }
     }
 
@@ -734,6 +766,7 @@ public class TicToeBot extends TelegramLongPollingBot {
     }
 
     private InlineKeyboardMarkup boardMarkup(User user, int[][] board) {
+        Game game = user.getGame();
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         for (int y = 0; y < board.length; y++) {
@@ -759,6 +792,45 @@ public class TicToeBot extends TelegramLongPollingBot {
             }
             rows.add(row);
         }
+
+        List<InlineKeyboardButton> drawRows = new ArrayList<>();
+        InlineKeyboardButton drawButton = new InlineKeyboardButton();
+        StringBuilder textBuilder = new StringBuilder();
+        if (game.getDrawAgreeMap().get(game.getXPlayer().getId())) {
+            textBuilder.append("✅");
+        }
+        textBuilder.append("Offer a draw");
+        if (game.getDrawAgreeMap().get(game.getOPlayer().getId())) {
+            textBuilder.append("✅");
+        }
+        drawButton.setText(textBuilder.toString());
+        drawButton.setCallbackData("drawAgree");
+        drawRows.add(drawButton);
+        rows.add(drawRows);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    private InlineKeyboardMarkup offerADrawMarkup(User user) {
+        Game game = user.getGame();
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton drawButton = new InlineKeyboardButton();
+        StringBuilder textBuilder = new StringBuilder();
+        if (game.getDrawAgreeMap().get(game.getXPlayer().getId())) {
+            textBuilder.append("✅");
+        }
+        textBuilder.append("Offer a draw");
+        if (game.getDrawAgreeMap().get(game.getOPlayer().getId())) {
+            textBuilder.append("✅");
+        }
+        drawButton.setText(textBuilder.toString());
+        drawButton.setCallbackData("drawAgree");
+        row.add(drawButton);
+        rows.add(row);
+
         markup.setKeyboard(rows);
         return markup;
     }

@@ -2,9 +2,7 @@ package com.example.tictoegamebot.entity;
 
 import lombok.Getter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class Game {
 
@@ -13,21 +11,25 @@ public class Game {
     @Getter
     private final int inLine;
     @Getter
-    private User xPlayer;
+    private final User xPlayer;
     @Getter
-    private User oPlayer;
+    private final User oPlayer;
     @Getter
     private String currentStep;
     private int countStep = 0;
     @Getter
     private boolean gameOver = false;
     @Getter
-    private List<List<Integer>> markPosition = new ArrayList<>();
+    private final List<List<Integer>> markPosition = new ArrayList<>();
+    @Getter
+    private final Map<Long, Boolean> drawAgreeMap = new HashMap<>();
 
     public Game(int type, User xPlayer, User oPlayer){
         this.xPlayer = xPlayer;
         this.oPlayer = oPlayer;
         this.currentStep = "X";
+        drawAgreeMap.put(xPlayer.getId(), false);
+        drawAgreeMap.put(oPlayer.getId(), false);
         switch(type){
             case 1:{
                 board = new int[5][5];
@@ -228,5 +230,19 @@ public class Game {
 
     public int getHeight(){
         return board.length;
+    }
+
+    public void changeAgreeMap(Long userId){
+        drawAgreeMap.put(userId, !drawAgreeMap.get(userId));
+        if (drawAgreeMap.get(xPlayer.getId()) && drawAgreeMap.get(oPlayer.getId())){
+            gameOver = true;
+        }
+    }
+
+    public User nowStep(){
+        if (currentStep.equals("X")){
+            return xPlayer;
+        }
+        return oPlayer;
     }
 }
