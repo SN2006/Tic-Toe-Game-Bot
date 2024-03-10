@@ -5,6 +5,7 @@ import com.example.tictoegamebot.entity.Statistic;
 import com.example.tictoegamebot.entity.User;
 import com.example.tictoegamebot.entity.X;
 import com.example.tictoegamebot.exception.AlreadyConnectedToFriendException;
+import com.example.tictoegamebot.exception.UserIsAlreadyYourFriendException;
 import com.example.tictoegamebot.exception.UserNotFoundException;
 import com.example.tictoegamebot.repositories.ORepository;
 import com.example.tictoegamebot.repositories.UserRepository;
@@ -65,11 +66,14 @@ public class UsersService {
             throw new UserNotFoundException("User with id " + id + " not found");
         }
         if (user.getFriend() != null){
-            throw new AlreadyConnectedToFriendException("You are already connected to the user Slavik, " +
-                    "to connect to another user, " +
-                    "first disconnect from the current one using the /disconnect command");
+            throw new AlreadyConnectedToFriendException(String.format("You are already playing a game with %s"
+                    , user.getFriend().getUsername()));
         }
         User friend = friendOptional.get();
+        if (friend.getFriend() != null){
+            throw new AlreadyConnectedToFriendException(String.format("%s is already playing a game",
+                    friend.getUsername()));
+        }
         user.setMyFriend(friend);
         userRepository.save(user);
     }
@@ -179,5 +183,19 @@ public class UsersService {
         }
         user.addMoney(money);
         return user;
+    }
+
+    @Transactional
+    public User addFriend(Long userId, Long friendId) throws UserNotFoundException, UserIsAlreadyYourFriendException {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null){
+            return null;
+        }
+        User friend = userRepository.findById(friendId).orElse(null);
+        if (friend == null){
+            throw new UserNotFoundException("User with id " + friendId + " not found");
+        }
+        user.addFriend(friend);
+        return friend;
     }
 }

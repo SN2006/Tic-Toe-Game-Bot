@@ -1,5 +1,6 @@
 package com.example.tictoegamebot.entity;
 
+import com.example.tictoegamebot.exception.UserIsAlreadyYourFriendException;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -40,6 +41,14 @@ public class User {
     @OneToOne
     @JoinColumn(name = "friend", referencedColumnName = "id")
     private User friend;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "friends",
+            joinColumns = @JoinColumn(name = "user_id", referencedColumnName = "id"),
+            inverseJoinColumns = @JoinColumn(name = "friend_id", referencedColumnName = "id")
+    )
+    private List<User> friends = new ArrayList<>();
 
     @ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinTable(name="x_user",
@@ -85,6 +94,14 @@ public class User {
             this.oSkins = new ArrayList<>();
         }
         this.oSkins.add(oSkin);
+    }
+
+    public void addFriend(User newFriend) throws UserIsAlreadyYourFriendException {
+        if (friends.contains(newFriend)) throw new UserIsAlreadyYourFriendException(
+                String.format("%s is already your friend", newFriend.getUsername())
+        );
+        this.friends.add(newFriend);
+        newFriend.friends.add(this);
     }
 
     public void increaseWins(){

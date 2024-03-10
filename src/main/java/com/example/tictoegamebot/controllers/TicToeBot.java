@@ -4,6 +4,7 @@ import com.example.tictoegamebot.config.BotConfig;
 import com.example.tictoegamebot.entity.*;
 import com.example.tictoegamebot.exception.AlreadyConnectedToFriendException;
 import com.example.tictoegamebot.exception.NotEnoughMoneyException;
+import com.example.tictoegamebot.exception.UserIsAlreadyYourFriendException;
 import com.example.tictoegamebot.exception.UserNotFoundException;
 import com.example.tictoegamebot.services.OsService;
 import com.example.tictoegamebot.services.UsersService;
@@ -28,10 +29,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -77,21 +75,22 @@ public class TicToeBot extends TelegramLongPollingBot {
                 }
             }else if (textFromUser.equals("/get_id")){
                 getIdMessage(user);
-            }else if (textFromUser.startsWith("/invite")){
-                try {
-                    Long friendId = Long.parseLong(textFromUser.split(" ")[1]);
-                    try {
-                        usersService.setFriend(user, friendId);
-                        connectMessage(user);
-                        connectMessage(user.getFriend());
-                    }catch (UserNotFoundException | AlreadyConnectedToFriendException e){
-                        sendMessage(e.getMessage(), userId.toString());
-                    }
+            }else if (textFromUser.startsWith("/addFriend")){
+                String[] split = textFromUser.split(" ");
+                try{
+                    Long friendId = Long.parseLong(split[1]);
+                    User friend = usersService.addFriend(user.getId(), friendId);
+                    sendMessage(String.format("%s has been added to your friend list",
+                            friend.getUsername()), user.getId().toString());
+                    sendMessage(String.format("%s has been added to your friend list",
+                            user.getUsername()), friend.getId().toString());
+                } catch (UserNotFoundException | UserIsAlreadyYourFriendException e) {
+                    sendMessage(e.getMessage(), user.getId().toString());
                 }catch (Exception e){
-                    sendMessage("Please enter a valid user ID (for example: /invite 1103395784)",
+                    sendMessage("Please enter a valid user ID (for example: /addFriend 1103395784)",
                             userId.toString());
                 }
-            } else if (textFromUser.startsWith("/disconnect")) {
+            }else if (textFromUser.startsWith("/disconnect")) {
                 try{
                     User friend = user.getFriend();
                     usersService.unsetFriend(user);
@@ -165,6 +164,11 @@ public class TicToeBot extends TelegramLongPollingBot {
                     games.remove(friend);
                     messageIdMap.remove(user);
                     messageIdMap.remove(friend);
+                    try {
+                        usersService.unsetFriend(user);
+                    } catch (UserNotFoundException e) {
+                        System.out.println(e.getMessage());
+                    }
                 }else{
                     if (game.nowStep().getId().equals(user.getId())){
                         nextStepMessage(user);
@@ -192,6 +196,29 @@ public class TicToeBot extends TelegramLongPollingBot {
                     games.put(user, game);
                     games.put(friend, game);
                     startGameMessage(game.nowStepUser());
+                }
+            }else if (call_data.equals("selectFriendToStart")){
+                chooseFriendToStartMessage(user);
+            }else if (call_data.startsWith("playWith")){
+                Long friendId = Long.parseLong(call_data.split(" ")[1]);
+                try {
+                    usersService.setFriend(user, friendId);
+                    user = usersService.getUserById(user.getId());
+                    User friend = user.getFriend();
+                    int randomNumber = (int) (Math.random() * 100);
+                    Game game;
+                    if (randomNumber < 50){
+                        game = new Game(friend.getGameMode(), user, friend);
+                    }else{
+                        game = new Game(user.getGameMode(), friend, user);
+                    }
+                    user.setGame(game);
+                    friend.setGame(game);
+                    games.put(user, game);
+                    games.put(friend, game);
+                    startGameMessage(game.nowStepUser());
+                }catch (UserNotFoundException | AlreadyConnectedToFriendException e){
+                    sendMessage(e.getMessage(), userId.toString());
                 }
             }else if(call_data.startsWith("setGameMode")){
                 int mode = Integer.parseInt(call_data.split(" ")[1]);
@@ -297,6 +324,11 @@ public class TicToeBot extends TelegramLongPollingBot {
                     games.remove(friend);
                     messageIdMap.remove(user);
                     messageIdMap.remove(friend);
+                    try {
+                        usersService.unsetFriend(user);
+                    } catch (UserNotFoundException e) {
+                        System.out.println(e.getMessage());
+                    }
                 }
             }
         }
@@ -618,7 +650,10 @@ public class TicToeBot extends TelegramLongPollingBot {
             }else if (place == 3){
                 text.append("\uD83E\uDD49: ");
             }else {
-                text.append("%d: ".formatted(place));
+                for (Character digit : String.valueOf(place).toCharArray()){
+                    text.append(Constants.digits.get(Integer.parseInt(digit.toString())));
+                }
+                text.append(": ");
             }
             if (ratingUser.getId().equals(user.getId())){
                 text.append("\uD83D\uDC49");
@@ -629,6 +664,18 @@ public class TicToeBot extends TelegramLongPollingBot {
             text.append("\uD83C\uDF96\n");
         }
         sendMessage(text.toString(), user.getId().toString());
+    }
+
+    private void chooseFriendToStartMessage(User user){
+        if (user.getFriends().isEmpty()){
+            sendMessage("You have no friends to start the game!\n" +
+                    "To add another friend, enter the command /addFriend (for example: /addFriend 1103395784)",
+                    user.getId().toString());
+            return;
+        }
+        sendMessage("Choose a friend to start the game\uD83D\uDC47\uD83C\uDFFD\n" +
+                "To add another friend, enter the command /addFriend (for example: /addFriend 1103395784)",
+                user.getId().toString(), selectedFriendToPlayMarkup(user));
     }
 
     private InlineKeyboardMarkup shopMarkup(){
@@ -663,16 +710,10 @@ public class TicToeBot extends TelegramLongPollingBot {
         List<InlineKeyboardButton> row7 = new ArrayList<>();
 
         InlineKeyboardButton startButton = new InlineKeyboardButton();
-        startButton.setText("\uD83D\uDC49Play with friend");
-        startButton.setCallbackData("start game");
+        startButton.setText("\uD83D\uDC49Play");
+        startButton.setCallbackData("selectFriendToStart");
         row1.add(startButton);
         rows.add(row1);
-
-        InlineKeyboardButton disconnectButton = new InlineKeyboardButton();
-        disconnectButton.setText("\uD83D\uDEABDisconnect from friend");
-        disconnectButton.setCallbackData("disconnect");
-        row2.add(disconnectButton);
-        rows.add(row2);
 
         InlineKeyboardButton ratingButton = new InlineKeyboardButton();
         ratingButton.setText("\uD83C\uDFC5Rating");
@@ -959,6 +1000,19 @@ public class TicToeBot extends TelegramLongPollingBot {
         row1.add(board8On8Button);
 
         rows.add(row1);
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    private InlineKeyboardMarkup selectedFriendToPlayMarkup(User user){
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        for (User friend : user.getFriends()) {
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            button.setText(friend.getUsername());
+            button.setCallbackData("playWith " + friend.getId());
+            rows.add(Collections.singletonList(button));
+        }
         markup.setKeyboard(rows);
         return markup;
     }
